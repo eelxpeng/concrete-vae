@@ -1,0 +1,5 @@
+checkpoint/
+sample/
+*.sublime-project
+*.sublime-workspace
+*.pyc
