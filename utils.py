@@ -48,7 +48,7 @@ def kl_categorical(dist):
     return kl
 
 
-def plot_2d(sess, sample_dir, step, num_categories, vae):
+def plot_2d(sess, sample_dir, step, num_categories, vae, shape=(28, 28, 1)):
     """
     TODO: this plots one image at a time, batch for speed
     """
@@ -57,7 +57,14 @@ def plot_2d(sess, sample_dir, step, num_categories, vae):
     x_values = np.linspace(-2, 2, nx)
     y_values = range(num_categories)
 
-    canvas = np.empty((28 * ny, 28 * nx))
+    height = shape[0]
+    width = shape[1]
+    channels = shape[2]
+
+    if channels == 1:
+        canvas = np.empty((height * ny, width * nx))
+    else:
+        canvas = np.empty((height * ny, width * nx, channels))
     for i, yi in enumerate(y_values):
         for j, xi in enumerate(x_values):
             category = np.zeros([1, num_categories])
@@ -65,10 +72,16 @@ def plot_2d(sess, sample_dir, step, num_categories, vae):
             continuous_z = [[xi]]
             new_z = np.concatenate([continuous_z, category], axis=1)
             np_x = sess.run([vae.p_x.mean()], {vae.z: new_z})
-            canvas[i * 28:(i + 1) * 28, j * 28:(j + 1) * 28] = \
-                np_x[0].reshape(28, 28)
+            if channels == 1:
+                canvas[i * height:(i + 1) * height,
+                       j * width:(j + 1) * width] = \
+                    np_x[0].reshape(height, width)
+            else:
+                canvas[i * height:(i + 1) * height,
+                       j * width:(j + 1) * width] = \
+                    np_x[0].reshape(shape)
     plt.figure(figsize=(20, 20))
     Xi, Yi = np.meshgrid(x_values, y_values)
-    plt.imshow(canvas, origin="upper", cmap="gray")
+    plt.imshow(canvas, origin="upper")
     plt.tight_layout()
     plt.savefig(sample_dir + '/' + str(step))

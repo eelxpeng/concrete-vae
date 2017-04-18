@@ -17,7 +17,7 @@ https://github.com/ericjang/gumbel-softmax
 
 
 class ConcreteVae():
-    def __init__(self, cont_dim=2, discrete_dim=0, input_shape=(28, 28, 1),
+    def __init__(self, input_, cont_dim=2, discrete_dim=0,
                  filters=[32, 64], hidden_dim=1024, model_name="ConcreteVae"):
         """
         Constructs a Variational Autoencoder that supports continuous and
@@ -25,33 +25,31 @@ class ConcreteVae():
         supported.
 
         Args:
+        input_        the input tensor
         cont_dim      the number of continuous latent dimensions
         discrete_dim  the number of categories in the discrete latent dimension
-        input_shape   the shape of the input (rows, cols, channels)
         filters       the number of filters for each convolution
         hidden_dim    the dimension of the fully-connected hidden layer between
                           the convolutions and the latent variable
         model_name    the name of the model
         """
+        self.input_ = input_
+        input_shape = input_.get_shape().as_list()
+        print('Input shape {}'.format(input_shape))
 
-        self.input_shape = input_shape
         self.model_name = model_name
 
-        self.x = tf.placeholder(tf.float32,
-                                [None, np.product(self.input_shape)])
-
         # Build the encoder
-        net = tf.reshape(self.x, [-1, 28, 28, 1])
-        net = slim.conv2d(net, filters[0], kernel_size=5, stride=1,
+        # According to karpathy, generative models work better when
+        # they discard pooling layers in favor of larger strides
+        # (https://cs231n.github.io/convolutional-networks/#pool)
+        net = slim.conv2d(self.input_, filters[0], kernel_size=5, stride=2,
                           padding='SAME')
-        net = slim.max_pool2d(net, kernel_size=2, stride=2, padding='SAME')
-        net = slim.conv2d(net, filters[1], kernel_size=5, stride=1,
+        net = slim.conv2d(net, filters[1], kernel_size=5, stride=2,
                           padding='SAME')
-        net = slim.max_pool2d(net, kernel_size=2, stride=2, padding='SAME')
-        net = slim.flatten(net, scope='flatten1')
-        net = slim.fully_connected(net, hidden_dim)
-        # TODO: consider dropout to reduce overfitting
+        # Use dropout to reduce overfitting
         # net = slim.dropout(net, 0.9)
+        net = slim.flatten(net)
 
         # Sample from the latent distribution
         q_z_mean = slim.fully_connected(net, cont_dim, activation_fn=None)
@@ -67,22 +65,21 @@ class ConcreteVae():
         continuous_z = sample_normal(q_z_mean, q_z_log_var)
         self.tau = tf.Variable(5.0, name="temperature")
         category = sample_gumbel(q_category_logits, self.tau)
-        z = tf.concat([continuous_z, category], axis=1)
-        self.z = z
+        self.z = tf.concat([continuous_z, category], axis=1)
 
         # Build the decoder
-        net = slim.fully_connected(self.z, hidden_dim)
-        net = slim.fully_connected(net, 7 * 7 * filters[1])
-        net = tf.reshape(net, [-1, 7, 7, filters[1]])
-        net = slim.conv2d_transpose(net, filters[1], kernel_size=5 * 2,
-                                    stride=1, padding='SAME')
-        net = slim.conv2d_transpose(net, filters[0], kernel_size=5 * 2,
-                                    stride=1, padding='SAME')
-        net = slim.conv2d_transpose(net, input_shape[2], kernel_size=5 * 2,
+        net = tf.reshape(self.z, [-1, 1, 1, cont_dim + discrete_dim])
+        net = slim.conv2d_transpose(net, filters[1], kernel_size=5,
+                                    stride=2, padding='SAME')
+        net = slim.conv2d_transpose(net, filters[0], kernel_size=5,
+                                    stride=2, padding='SAME')
+        net = slim.conv2d_transpose(net, input_shape[3], kernel_size=5,
                                     padding='VALID')
         net = slim.flatten(net)
-        logits = slim.fully_connected(net, np.product(self.input_shape),
+        # Do not include the batch size in creating the final layer
+        logits = slim.fully_connected(net, np.product(input_shape[1:]),
                                       activation_fn=None)
+        print('Output shape {}'.format(logits.get_shape()))
         p_x = Bernoulli(logits=logits)
         self.p_x = p_x
 
@@ -98,7 +95,8 @@ class ConcreteVae():
         # should it be divded by the number of normal variables
         discrete_kl = kl_categorical(self.q_category)
         normal_kl = kl_normal(self.q_z_mean, self.q_z_log_var)
-        reconstruction = tf.reduce_sum(self.p_x.log_prob(self.x), 1)
+        reconstruction = tf.reduce_sum(
+            self.p_x.log_prob(slim.flatten(self.input_)), 1)
 
         self.discrete_kl = discrete_kl
         self.normal_kl = normal_kl
