@@ -109,7 +109,9 @@ def train(num_iters=20000, batch_size=100, checkpoint_step=10000,
             path = saver.save(sess, checkpoint_dir + '/model.ckpt')
             print('Model saved at iteration {} in checkpoint {}'
                   .format(i, path))
-        if i % sample_step == 0:
+        # TODO: support plotting samples with more than a single continuous
+        # and discrete dimension
+        if i % sample_step == 0 and cont_dim + discrete_dim == 11:
             plot_2d(sess, sample_dir=sample_dir, step=i,
                     num_categories=discrete_dim, vae=vae, shape=data_shape)
             print('Sample generated at step {}'.format(i))
