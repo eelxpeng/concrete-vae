@@ -48,14 +48,27 @@ def kl_categorical(dist):
     return kl
 
 
-def plot_2d(sess, sample_dir, step, num_categories, vae, shape=(28, 28, 1)):
+def plot_2d(sess, sample_dir, step, vae, shape, cont_dim, discrete_dim):
     """
+    Plot output from the generator. Categories are plotted on the y-axis.
+    If there is one continuous dimension, the x-axis interpolates from
+    [-2, 2] to show what varies through the normal distribution. If there
+    is more than one continuous dimension, the x-axis shows random samples
+    from N~(0,1)
+
     TODO: this plots one image at a time, batch for speed
     """
+
+    interpolate = cont_dim == 1
+
     nx = 10
     ny = 10
-    x_values = np.linspace(-2, 2, nx)
-    y_values = range(num_categories)
+    if interpolate:
+        x_values = np.linspace(-2, 2, nx)
+    else:
+        x_values = np.random.normal(loc=0., scale=1., size=(nx, cont_dim))
+
+    y_values = range(discrete_dim)
 
     height = shape[0]
     width = shape[1]
@@ -67,11 +80,11 @@ def plot_2d(sess, sample_dir, step, num_categories, vae, shape=(28, 28, 1)):
         canvas = np.empty((height * ny, width * nx, channels))
     for i, yi in enumerate(y_values):
         for j, xi in enumerate(x_values):
-            category = np.zeros([1, num_categories])
+            category = np.zeros([1, discrete_dim])
             category[0][yi] = 1
-            continuous_z = [[xi]]
-            new_z = np.concatenate([continuous_z, category], axis=1)
-            np_x = sess.run([vae.p_x.mean()], {vae.z: new_z})
+            continuous_z = [xi]
+            np_x = sess.run([vae.logits], {vae.category: category,
+                                           vae.continuous_z: np.reshape(continuous_z, (1, cont_dim))})
             if channels == 1:
                 canvas[i * height:(i + 1) * height,
                        j * width:(j + 1) * width] = \

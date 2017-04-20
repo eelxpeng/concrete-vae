@@ -62,10 +62,10 @@ class ConcreteVae():
         self.q_z_log_var = q_z_log_var
         self.q_category = q_category
 
-        continuous_z = sample_normal(q_z_mean, q_z_log_var)
+        self.continuous_z = sample_normal(q_z_mean, q_z_log_var)
         self.tau = tf.Variable(5.0, name="temperature")
-        category = sample_gumbel(q_category_logits, self.tau)
-        self.z = tf.concat([continuous_z, category], axis=1)
+        self.category = sample_gumbel(q_category_logits, self.tau)
+        self.z = tf.concat([self.continuous_z, self.category], axis=1)
 
         # Build the decoder
         net = tf.reshape(self.z, [-1, 1, 1, cont_dim + discrete_dim])
@@ -76,11 +76,12 @@ class ConcreteVae():
         net = slim.conv2d_transpose(net, input_shape[3], kernel_size=5,
                                     padding='VALID')
         net = slim.flatten(net)
+        # TODO: figure out the whole logits and Bernoulli dist vs MSE thing
         # Do not include the batch size in creating the final layer
-        logits = slim.fully_connected(net, np.product(input_shape[1:]),
-                                      activation_fn=None)
-        print('Output shape {}'.format(logits.get_shape()))
-        p_x = Bernoulli(logits=logits)
+        self.logits = slim.fully_connected(net, np.product(input_shape[1:]),
+                                           activation_fn=None)
+        print('Output shape {}'.format(self.logits.get_shape()))
+        p_x = Bernoulli(logits=self.logits)
         self.p_x = p_x
 
         self.loss = self._vae_loss()
@@ -95,8 +96,12 @@ class ConcreteVae():
         # should it be divded by the number of normal variables
         discrete_kl = kl_categorical(self.q_category)
         normal_kl = kl_normal(self.q_z_mean, self.q_z_log_var)
-        reconstruction = tf.reduce_sum(
-            self.p_x.log_prob(slim.flatten(self.input_)), 1)
+        # reconstruction = tf.reduce_sum(
+        #    self.p_x.log_prob(slim.flatten(self.input_)), 1)
+
+        d = (slim.flatten(self.input_) - self.logits)
+        d2 = tf.multiply(d, d) * 2.0
+        reconstruction = -tf.reduce_sum(d2, 1)
 
         self.discrete_kl = discrete_kl
         self.normal_kl = normal_kl

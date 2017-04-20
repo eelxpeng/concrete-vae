@@ -80,6 +80,7 @@ def train(num_iters=20000, batch_size=100, checkpoint_step=10000,
         data_shape = input_.get_shape().as_list()[1:]
     elif dataset == 'cifar10':
         input_, _ = cifar10_input.inputs(True, data_dir, batch_size)
+        # TODO: do I need this +.5?
         input_ = input_ + .5
         data_shape = input_.get_shape().as_list()[1:]
     else:
@@ -109,11 +110,10 @@ def train(num_iters=20000, batch_size=100, checkpoint_step=10000,
             path = saver.save(sess, checkpoint_dir + '/model.ckpt')
             print('Model saved at iteration {} in checkpoint {}'
                   .format(i, path))
-        # TODO: support plotting samples with more than a single continuous
-        # and discrete dimension
-        if i % sample_step == 0 and cont_dim + discrete_dim == 11:
-            plot_2d(sess, sample_dir=sample_dir, step=i,
-                    num_categories=discrete_dim, vae=vae, shape=data_shape)
+        if i % sample_step == 0:
+            plot_2d(sess, sample_dir=sample_dir, step=i, vae=vae,
+                    shape=data_shape, discrete_dim=discrete_dim,
+                    cont_dim=cont_dim)
             print('Sample generated at step {}'.format(i))
         if i % 1000 == 0:
             temp = np.maximum(initial_temp * np.exp(-anneal_rate * i),
