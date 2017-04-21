@@ -19,10 +19,14 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import glob
 import os
+import shutil
+import tarfile
 
 from six.moves import xrange  # pylint: disable=redefined-builtin
 import tensorflow as tf
+from tensorflow.contrib.learn.python.learn.datasets import base
 
 # Process images of this size. Note that this differs from the original CIFAR
 # image size of 32 x 32. If one alters this number, then the entire model
@@ -33,6 +37,11 @@ IMAGE_SIZE = 24
 NUM_CLASSES = 10
 NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = 50000
 NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = 10000
+
+
+CIFAR10_FILE = 'cifar-10-binary.tar.gz'
+CIFAR10_URL = os.path.join('https://www.cs.toronto.edu/~kriz/', CIFAR10_FILE)
+CIFAR10_UNPACKED_FOLDER = 'cifar-10-batches-bin/'
 
 
 def read_cifar10(filename_queue):
@@ -150,6 +159,9 @@ def inputs(eval_data, data_dir, batch_size):
     images: Images. 4D tensor of [batch_size, IMAGE_SIZE, IMAGE_SIZE, 3] size.
     labels: Labels. 1D tensor of [batch_size] size.
   """
+  if not tf.gfile.Exists(data_dir):
+    download_unpack_cifar10(data_dir)
+
   if not eval_data:
     filenames = [os.path.join(data_dir, 'data_batch_%d.bin' % i)
                  for i in xrange(1, 6)]
@@ -157,10 +169,6 @@ def inputs(eval_data, data_dir, batch_size):
   else:
     filenames = [os.path.join(data_dir, 'test_batch.bin')]
     num_examples_per_epoch = NUM_EXAMPLES_PER_EPOCH_FOR_EVAL
-
-  for f in filenames:
-    if not tf.gfile.Exists(f):
-      raise ValueError('Failed to find file: ' + f)
 
   # Create a queue that produces the filenames to read.
   filename_queue = tf.train.string_input_producer(filenames)
@@ -193,3 +201,13 @@ def inputs(eval_data, data_dir, batch_size):
   return _generate_image_and_label_batch(float_image, read_input.label,
                                          min_queue_examples, batch_size,
                                          shuffle=True)
+
+def download_unpack_cifar10(data_dir):
+  file_ = base.maybe_download(CIFAR10_FILE, data_dir, CIFAR10_URL)
+  tar = tarfile.open(file_, mode='r:gz')
+  tar.extractall(path=data_dir)
+  tar.close()
+  for filename in glob.glob(os.path.join(data_dir, CIFAR10_UNPACKED_FOLDER, '*')):
+      os.rename(filename, filename.replace(CIFAR10_UNPACKED_FOLDER, ''))
+  os.remove(file_)
+  shutil.rmtree(os.path.join(data_dir, CIFAR10_UNPACKED_FOLDER))

@@ -13,7 +13,9 @@
 # limitations under the License.
 # ==============================================================================
 
-"""Train and Eval the MNIST network.
+"""Branched from https://github.com/tensorflow/tensorflow/blob/master/tensorflow/examples/how_tos/reading_data/fully_connected_reader.py
+
+Train and Eval the MNIST network.
 
 This version is like fully_connected_feed.py but uses data converted
 to a TFRecords file containing tf.train.Example protocol buffers.

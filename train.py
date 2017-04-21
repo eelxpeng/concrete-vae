@@ -17,7 +17,7 @@ def main():
                         help='Number of iterations')
     parser.add_argument('--batch_size', type=int, default=100,
                         help='Batch size')
-    parser.add_argument('--sample_step', type=int, default=5000,
+    parser.add_argument('--sample_step', type=int, default=3000,
                         help='Plot a sample this often')
     parser.add_argument('--checkpoint_step', type=int, default=10000,
                         help='Save a model checkpoint this often')
@@ -80,8 +80,6 @@ def train(num_iters=20000, batch_size=100, checkpoint_step=10000,
         data_shape = input_.get_shape().as_list()[1:]
     elif dataset == 'cifar10':
         input_, _ = cifar10_input.inputs(True, data_dir, batch_size)
-        # TODO: do I need this +.5?
-        input_ = input_ + .5
         data_shape = input_.get_shape().as_list()[1:]
     else:
         raise Exception('The dataset must be "mnist" or "cifar10"')
